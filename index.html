@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>USD / GEL Converter</title>
+
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+  />
+
+  <style>
+    :root {
+      --page-max-width: 560px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding:
+        max(20px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      display: flex;
+      justify-content: center;
+      background: var(--pico-background-color);
+    }
+
+    main {
+      width: 100%;
+      max-width: var(--page-max-width);
+    }
+
+    h1 {
+      margin-top: 8px;
+      margin-bottom: 20px;
+      font-size: clamp(1.8rem, 8vw, 2.4rem);
+      line-height: 1.1;
+    }
+
+    label {
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      min-height: 52px;
+      font-size: 1.15rem;
+    }
+
+    .result {
+      margin-top: 24px;
+      padding: 18px;
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 16px;
+      background: var(--pico-card-background-color);
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 1.05rem;
+    }
+
+    .result-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-value {
+      font-weight: 700;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .muted {
+      margin-top: 16px;
+      margin-bottom: 0;
+      color: var(--pico-muted-color);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 420px) {
+      body {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .result-row {
+        display: block;
+      }
+
+      .result-value {
+        display: block;
+        margin-top: 4px;
+        text-align: left;
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>USD / GEL Converter</h1>
+
+    <label for="usd">
+      USD
+      <input
+        id="usd"
+        type="number"
+        min="0"
+        step="0.01"
+        inputmode="decimal"
+        placeholder="Example: 100"
+      />
+    </label>
+
+    <label for="gel">
+      GEL
+      <input
+        id="gel"
+        type="number"
+        min="0"
+        step="0.01"
+        inputmode="decimal"
+        placeholder="Example: 250"
+      />
+    </label>
+
+    <label for="rate">
+      USD → GEL rate
+      <input
+        id="rate"
+        type="number"
+        min="0"
+        step="0.0001"
+        inputmode="decimal"
+        placeholder="Loading..."
+      />
+    </label>
+
+    <section class="result" aria-live="polite">
+      <div class="result-row">
+        <span>Total in USD</span>
+        <span class="result-value" id="totalUsd">0.00</span>
+      </div>
+
+      <div class="result-row">
+        <span>Total in GEL</span>
+        <span class="result-value" id="totalGel">0.00</span>
+      </div>
+
+      <p class="muted" id="rateInfo">Loading today’s rate...</p>
+    </section>
+  </main>
+
+  <script>
+    const usdInput = document.getElementById("usd");
+    const gelInput = document.getElementById("gel");
+    const rateInput = document.getElementById("rate");
+    const totalUsd = document.getElementById("totalUsd");
+    const totalGel = document.getElementById("totalGel");
+    const rateInfo = document.getElementById("rateInfo");
+
+    function num(value) {
+      return Number.parseFloat(value) || 0;
+    }
+
+    function formatMoney(value) {
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function calculate() {
+      const usd = num(usdInput.value);
+      const gel = num(gelInput.value);
+      const rate = num(rateInput.value);
+
+      if (rate <= 0) {
+        totalUsd.textContent = "0.00";
+        totalGel.textContent = "0.00";
+        return;
+      }
+
+      const totalInGel = usd * rate + gel;
+      const totalInUsd = usd + gel / rate;
+
+      totalGel.textContent = formatMoney(totalInGel);
+      totalUsd.textContent = formatMoney(totalInUsd);
+    }
+
+    async function loadRate() {
+      try {
+        const response = await fetch("https://open.er-api.com/v6/latest/USD");
+        const data = await response.json();
+
+        const rate = data?.rates?.GEL;
+
+        if (!rate) {
+          throw new Error("GEL rate not found");
+        }
+
+        rateInput.value = rate.toFixed(4);
+        rateInfo.textContent = `Rate loaded: 1 USD = ${rate.toFixed(4)} GEL`;
+        calculate();
+      } catch (error) {
+        rateInfo.textContent = "Could not load rate automatically. Enter rate manually.";
+        console.error(error);
+      }
+    }
+
+    usdInput.addEventListener("input", calculate);
+    gelInput.addEventListener("input", calculate);
+    rateInput.addEventListener("input", calculate);
+
+    loadRate();
+  </script>
+</body>
+</html>
